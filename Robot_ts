@@ -1,0 +1,51 @@
+export interface Robot {
+  id: string;
+  position: { x: number; y: number };
+  velocity: { x: number; y: number };
+  rotation: number;
+  status: 'active' | 'inactive' | 'maintenance' | 'error' | 'charging' | 'patrol';
+  battery: number;
+  efficiency: number;
+  task: string | null;
+  health: number;
+  temperature: number;
+  lastUpdate: number;
+  formation?: { x: number; y: number };
+  // Advanced features
+  aiMode: 'autonomous' | 'manual' | 'learning' | 'patrol';
+  sensors: {
+    lidar: number;
+    camera: number;
+    proximity: number;
+    gyroscope: { x: number; y: number; z: number };
+  };
+  performance: {
+    speed: number;
+    accuracy: number;
+    reliability: number;
+    uptime: number;
+  };
+  maintenance: {
+    nextService: number;
+    hoursOperated: number;
+    faultHistory: string[];
+    lastMaintenance: number;
+  };
+  communication: {
+    signalStrength: number;
+    latency: number;
+    packetsLost: number;
+  };
+  energy: {
+    consumption: number;
+    efficiency: number;
+    solarCharge: number;
+    batteryHealth: number;
+  };
+  mission: {
+    currentObjective: string | null;
+    progress: number;
+    priority: 'low' | 'medium' | 'high' | 'critical';
+    estimatedCompletion: number;
+  };
+}
