@@ -1,0 +1,254 @@
+import React, { useRef, useEffect } from 'react';
+import { Robot } from '../types/Robot';
+
+interface RobotCanvasProps {
+  robots: Robot[];
+  selectedRobots: Set<string>;
+  onRobotSelect: (robotId: string, isMultiSelect: boolean) => void;
+  width: number;
+  height: number;
+}
+
+export const RobotCanvas: React.FC<RobotCanvasProps> = ({
+  robots,
+  selectedRobots,
+  onRobotSelect,
+  width,
+  height
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas with dark background
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw advanced grid with neon effect
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 1;
+    ctx.shadowColor = '#00ff88';
+    ctx.shadowBlur = 2;
+    
+    for (let x = 0; x < width; x += 25) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < height; y += 25) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+
+    ctx.shadowBlur = 0;
+
+    // Draw robots with full-body visualization
+    robots.forEach(robot => {
+      const isSelected = selectedRobots.has(robot.id);
+      const size = isSelected ? 8 : 6;
+      
+      ctx.save();
+      ctx.translate(robot.position.x, robot.position.y);
+      ctx.rotate((robot.rotation * Math.PI) / 180);
+
+      // Robot body (main chassis)
+      ctx.fillStyle = getRobotColor(robot.status);
+      ctx.shadowColor = getRobotColor(robot.status);
+      ctx.shadowBlur = isSelected ? 8 : 4;
+      
+      // Main body - rounded rectangle
+      ctx.beginPath();
+      ctx.roundRect(-size, -size * 0.7, size * 2, size * 1.4, 2);
+      ctx.fill();
+
+      // Robot head/sensor array
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, -size * 0.5, size * 0.3, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Arms/manipulators
+      ctx.strokeStyle = getRobotColor(robot.status);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.8, -size * 0.2);
+      ctx.lineTo(-size * 1.3, -size * 0.5);
+      ctx.moveTo(size * 0.8, -size * 0.2);
+      ctx.lineTo(size * 1.3, -size * 0.5);
+      ctx.stroke();
+
+      // Legs/wheels
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.5, size * 0.7);
+      ctx.lineTo(-size * 0.5, size * 1.2);
+      ctx.moveTo(size * 0.5, size * 0.7);
+      ctx.lineTo(size * 0.5, size * 1.2);
+      ctx.stroke();
+
+      // Status indicators
+      if (robot.status === 'active') {
+        ctx.fillStyle = '#00ff88';
+        ctx.beginPath();
+        ctx.arc(-size * 0.6, -size * 0.8, 2, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+
+      // Battery indicator
+      const batteryColor = robot.battery > 50 ? '#00ff88' : robot.battery > 20 ? '#ffaa00' : '#ff3333';
+      ctx.fillStyle = batteryColor;
+      ctx.fillRect(size * 0.4, -size * 0.9, 4, robot.battery / 100 * 8);
+
+      // AI mode indicator
+      if (robot.aiMode === 'autonomous') {
+        ctx.fillStyle = '#0088ff';
+        ctx.beginPath();
+        ctx.arc(0, size * 0.9, 2, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+
+      // Mission priority indicator
+      if (robot.mission.currentObjective) {
+        const priorityColors = {
+          low: '#888888',
+          medium: '#ffaa00',
+          high: '#ff6600',
+          critical: '#ff0000'
+        };
+        ctx.fillStyle = priorityColors[robot.mission.priority];
+        ctx.beginPath();
+        ctx.arc(size * 0.8, size * 0.8, 2, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+
+      // Selection indicator with advanced glow
+      if (isSelected) {
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#00ff88';
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(0, 0, size + 8, 0, 2 * Math.PI);
+        ctx.stroke();
+        
+        // Selection pulse effect
+        const pulseSize = size + 12 + Math.sin(Date.now() * 0.01) * 3;
+        ctx.lineWidth = 1;
+        ctx.shadowBlur = 20;
+        ctx.beginPath();
+        ctx.arc(0, 0, pulseSize, 0, 2 * Math.PI);
+        ctx.stroke();
+      }
+
+      // Communication range visualization for selected robots
+      if (isSelected && robot.communication.signalStrength > 70) {
+        ctx.strokeStyle = `rgba(0, 136, 255, ${robot.communication.signalStrength / 500})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, robot.communication.signalStrength * 2, 0, 2 * Math.PI);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+
+      // Robot ID label for selected robots
+      if (isSelected) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(robot.id, robot.position.x, robot.position.y - size - 15);
+        
+        // Performance metrics
+        ctx.font = '8px monospace';
+        ctx.fillStyle = '#00ff88';
+        ctx.fillText(`${robot.performance.uptime.toFixed(0)}%`, robot.position.x, robot.position.y + size + 20);
+      }
+    });
+
+    // Draw formation lines for coordinated movement
+    if (robots.some(r => r.formation)) {
+      ctx.strokeStyle = 'rgba(0, 255, 136, 0.2)';
+      ctx.lineWidth = 1;
+      robots.forEach(robot => {
+        if (robot.formation) {
+          ctx.beginPath();
+          ctx.moveTo(robot.position.x, robot.position.y);
+          ctx.lineTo(robot.formation.x, robot.formation.y);
+          ctx.stroke();
+        }
+      });
+    }
+
+  }, [robots, selectedRobots, width, height]);
+
+  const handleCanvasClick = (event: React.MouseEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    // Find closest robot within click radius
+    let closestRobot: Robot | null = null;
+    let closestDistance = Infinity;
+
+    robots.forEach(robot => {
+      const distance = Math.sqrt(
+        Math.pow(robot.position.x - x, 2) + Math.pow(robot.position.y - y, 2)
+      );
+      if (distance < 15 && distance < closestDistance) {
+        closestDistance = distance;
+        closestRobot = robot;
+      }
+    });
+
+    if (closestRobot) {
+      onRobotSelect(closestRobot.id, event.ctrlKey || event.metaKey);
+    }
+  };
+
+  const getRobotColor = (status: Robot['status']): string => {
+    switch (status) {
+      case 'active': return '#00ff88';
+      case 'inactive': return '#666666';
+      case 'maintenance': return '#ffaa00';
+      case 'error': return '#ff3333';
+      case 'charging': return '#0088ff';
+      case 'patrol': return '#ff6600';
+      default: return '#666666';
+    }
+  };
+
+  return (
+    <div className="relative">
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={height}
+        onClick={handleCanvasClick}
+        className="border border-cyan-500 bg-black cursor-crosshair rounded-lg shadow-2xl"
+        style={{ 
+          imageRendering: 'pixelated',
+          boxShadow: '0 0 20px rgba(0, 255, 136, 0.3)'
+        }}
+      />
+      
+      {/* Canvas overlay with performance info */}
+      <div className="absolute top-2 left-2 bg-black/80 border border-cyan-500/50 rounded px-3 py-2 text-xs text-cyan-300">
+        <div className="flex items-center gap-4">
+          <span>FPS: 60</span>
+          <span>Render: {robots.length} robots</span>
+          <span>Selected: {selectedRobots.size}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
