@@ -1,0 +1,34 @@
+export interface FleetStats {
+  totalRobots: number;
+  activeRobots: number;
+  inactiveRobots: number;
+  maintenanceRobots: number;
+  errorRobots: number;
+  chargingRobots: number;
+  patrolRobots: number;
+  averageBattery: number;
+  averageEfficiency: number;
+  averageHealth: number;
+  totalTasks: number;
+  completedTasks: number;
+  // Advanced metrics
+  fleetPerformance: {
+    overallEfficiency: number;
+    predictedDowntime: number;
+    energyConsumption: number;
+    communicationHealth: number;
+    aiOptimization: number;
+  };
+  predictiveAnalytics: {
+    maintenanceAlerts: number;
+    batteryReplacements: number;
+    performanceTrends: 'improving' | 'stable' | 'declining';
+    riskAssessment: 'low' | 'medium' | 'high';
+  };
+  missionStats: {
+    activeMissions: number;
+    completionRate: number;
+    averageResponseTime: number;
+    criticalTasks: number;
+  };
+}
