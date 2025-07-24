@@ -1,0 +1,379 @@
+import { useState, useEffect, useCallback } from 'react';
+import { Robot } from '../types/Robot';
+import { FleetStats } from '../types/FleetStats';
+
+const ROBOT_COUNT = 1000;
+const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 600;
+
+export const useRobotFleet = () => {
+  const [robots, setRobots] = useState<Robot[]>([]);
+  const [selectedRobots, setSelectedRobots] = useState<Set<string>>(new Set());
+  const [isRunning, setIsRunning] = useState(false);
+  const [formation, setFormation] = useState<'grid' | 'circle' | 'line' | 'random' | 'swarm' | 'patrol'>('grid');
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [emergencyMode, setEmergencyMode] = useState(false);
+
+  // Initialize robots with advanced features
+  useEffect(() => {
+    const initialRobots: Robot[] = [];
+    
+    for (let i = 0; i < ROBOT_COUNT; i++) {
+      const statusOptions: Robot['status'][] = ['active', 'inactive', 'maintenance', 'error', 'charging', 'patrol'];
+      const aiModes: Robot['aiMode'][] = ['autonomous', 'manual', 'learning', 'patrol'];
+      const priorities: Robot['mission']['priority'][] = ['low', 'medium', 'high', 'critical'];
+      
+      initialRobots.push({
+        id: `RBT-${i.toString().padStart(4, '0')}`,
+        position: {
+          x: Math.random() * CANVAS_WIDTH,
+          y: Math.random() * CANVAS_HEIGHT
+        },
+        velocity: {
+          x: (Math.random() - 0.5) * 3,
+          y: (Math.random() - 0.5) * 3
+        },
+        rotation: Math.random() * 360,
+        status: statusOptions[Math.floor(Math.random() * statusOptions.length)],
+        battery: 60 + Math.random() * 40,
+        efficiency: 70 + Math.random() * 30,
+        task: Math.random() > 0.6 ? `Mission-${Math.floor(Math.random() * 200)}` : null,
+        health: 80 + Math.random() * 20,
+        temperature: 25 + Math.random() * 35,
+        lastUpdate: Date.now(),
+        aiMode: aiModes[Math.floor(Math.random() * aiModes.length)],
+        sensors: {
+          lidar: 85 + Math.random() * 15,
+          camera: 90 + Math.random() * 10,
+          proximity: 80 + Math.random() * 20,
+          gyroscope: {
+            x: (Math.random() - 0.5) * 2,
+            y: (Math.random() - 0.5) * 2,
+            z: (Math.random() - 0.5) * 2
+          }
+        },
+        performance: {
+          speed: 70 + Math.random() * 30,
+          accuracy: 85 + Math.random() * 15,
+          reliability: 90 + Math.random() * 10,
+          uptime: 95 + Math.random() * 5
+        },
+        maintenance: {
+          nextService: Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000,
+          hoursOperated: Math.random() * 1000,
+          faultHistory: [],
+          lastMaintenance: Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000
+        },
+        communication: {
+          signalStrength: 70 + Math.random() * 30,
+          latency: Math.random() * 50,
+          packetsLost: Math.random() * 5
+        },
+        energy: {
+          consumption: 20 + Math.random() * 30,
+          efficiency: 80 + Math.random() * 20,
+          solarCharge: Math.random() * 10,
+          batteryHealth: 85 + Math.random() * 15
+        },
+        mission: {
+          currentObjective: Math.random() > 0.7 ? `Objective-${Math.floor(Math.random() * 100)}` : null,
+          progress: Math.random() * 100,
+          priority: priorities[Math.floor(Math.random() * priorities.length)],
+          estimatedCompletion: Date.now() + Math.random() * 24 * 60 * 60 * 1000
+        }
+      });
+    }
+    
+    setRobots(initialRobots);
+  }, []);
+
+  // Advanced animation loop with AI behaviors
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const interval = setInterval(() => {
+      setRobots(prevRobots => 
+        prevRobots.map(robot => {
+          let newVelocity = { ...robot.velocity };
+          let newPosition = { ...robot.position };
+          let newRotation = robot.rotation;
+
+          // AI-driven movement patterns
+          if (aiEnabled && robot.aiMode === 'autonomous') {
+            // Swarm intelligence - avoid collisions and maintain formation
+            const nearbyRobots = prevRobots.filter(other => 
+              other.id !== robot.id &&
+              Math.sqrt(
+                Math.pow(other.position.x - robot.position.x, 2) +
+                Math.pow(other.position.y - robot.position.y, 2)
+              ) < 50
+            );
+
+            if (nearbyRobots.length > 0) {
+              // Collision avoidance
+              const avgX = nearbyRobots.reduce((sum, r) => sum + r.position.x, 0) / nearbyRobots.length;
+              const avgY = nearbyRobots.reduce((sum, r) => sum + r.position.y, 0) / nearbyRobots.length;
+              
+              newVelocity.x += (robot.position.x - avgX) * 0.01;
+              newVelocity.y += (robot.position.y - avgY) * 0.01;
+            }
+          }
+
+          // Formation-based movement
+          if (robot.formation) {
+            const dx = robot.formation.x - robot.position.x;
+            const dy = robot.formation.y - robot.position.y;
+            newVelocity.x += dx * 0.02;
+            newVelocity.y += dy * 0.02;
+          }
+
+          // Apply velocity limits
+          const maxSpeed = robot.performance.speed / 20;
+          const speed = Math.sqrt(newVelocity.x ** 2 + newVelocity.y ** 2);
+          if (speed > maxSpeed) {
+            newVelocity.x = (newVelocity.x / speed) * maxSpeed;
+            newVelocity.y = (newVelocity.y / speed) * maxSpeed;
+          }
+
+          // Update position
+          newPosition.x = Math.max(0, Math.min(CANVAS_WIDTH, robot.position.x + newVelocity.x));
+          newPosition.y = Math.max(0, Math.min(CANVAS_HEIGHT, robot.position.y + newVelocity.y));
+
+          // Bounce off walls
+          if (newPosition.x <= 0 || newPosition.x >= CANVAS_WIDTH) {
+            newVelocity.x = -newVelocity.x;
+          }
+          if (newPosition.y <= 0 || newPosition.y >= CANVAS_HEIGHT) {
+            newVelocity.y = -newVelocity.y;
+          }
+
+          // Update rotation based on movement
+          if (Math.abs(newVelocity.x) > 0.1 || Math.abs(newVelocity.y) > 0.1) {
+            newRotation = Math.atan2(newVelocity.y, newVelocity.x) * (180 / Math.PI);
+          }
+
+          // Advanced system updates
+          const batteryDrain = robot.status === 'active' ? 0.02 : 0.005;
+          const newBattery = Math.max(0, robot.battery - batteryDrain + robot.energy.solarCharge * 0.01);
+          
+          // Auto-charging behavior
+          let newStatus = robot.status;
+          if (newBattery < 15 && robot.status !== 'charging') {
+            newStatus = 'charging';
+          } else if (newBattery > 90 && robot.status === 'charging') {
+            newStatus = 'active';
+          }
+
+          return {
+            ...robot,
+            position: newPosition,
+            velocity: newVelocity,
+            rotation: newRotation,
+            status: emergencyMode ? 'inactive' : newStatus,
+            battery: newBattery,
+            efficiency: Math.min(100, robot.efficiency + (Math.random() - 0.5) * 0.2),
+            health: Math.max(0, Math.min(100, robot.health + (Math.random() - 0.5) * 0.1)),
+            temperature: Math.max(20, Math.min(80, robot.temperature + (Math.random() - 0.5) * 0.5)),
+            sensors: {
+              ...robot.sensors,
+              lidar: Math.max(0, Math.min(100, robot.sensors.lidar + (Math.random() - 0.5) * 0.5)),
+              camera: Math.max(0, Math.min(100, robot.sensors.camera + (Math.random() - 0.5) * 0.3)),
+              proximity: Math.max(0, Math.min(100, robot.sensors.proximity + (Math.random() - 0.5) * 1))
+            },
+            performance: {
+              ...robot.performance,
+              uptime: Math.min(100, robot.performance.uptime + (robot.status === 'active' ? 0.01 : -0.05))
+            },
+            communication: {
+              ...robot.communication,
+              signalStrength: Math.max(0, Math.min(100, robot.communication.signalStrength + (Math.random() - 0.5) * 2)),
+              latency: Math.max(0, robot.communication.latency + (Math.random() - 0.5) * 2)
+            },
+            mission: {
+              ...robot.mission,
+              progress: robot.mission.currentObjective ? 
+                Math.min(100, robot.mission.progress + Math.random() * 2) : 
+                robot.mission.progress
+            },
+            lastUpdate: Date.now()
+          };
+        })
+      );
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, [isRunning, aiEnabled, emergencyMode]);
+
+  const activateRobots = useCallback((robotIds: string[]) => {
+    setRobots(prev => prev.map(robot => 
+      robotIds.includes(robot.id) ? { ...robot, status: 'active' } : robot
+    ));
+  }, []);
+
+  const deactivateRobots = useCallback((robotIds: string[]) => {
+    setRobots(prev => prev.map(robot => 
+      robotIds.includes(robot.id) ? { ...robot, status: 'inactive' } : robot
+    ));
+  }, []);
+
+  const emergencyStop = useCallback(() => {
+    setEmergencyMode(true);
+    setIsRunning(false);
+    setTimeout(() => setEmergencyMode(false), 5000);
+  }, []);
+
+  const setFormationPattern = useCallback((pattern: 'grid' | 'circle' | 'line' | 'random' | 'swarm' | 'patrol') => {
+    setFormation(pattern);
+    
+    setRobots(prev => prev.map((robot, index) => {
+      let targetPosition = { x: robot.position.x, y: robot.position.y };
+      
+      switch (pattern) {
+        case 'grid':
+          const cols = Math.ceil(Math.sqrt(ROBOT_COUNT));
+          const spacing = Math.min(CANVAS_WIDTH / cols, CANVAS_HEIGHT / cols) * 0.8;
+          targetPosition = {
+            x: (index % cols) * spacing + spacing / 2 + 50,
+            y: Math.floor(index / cols) * spacing + spacing / 2 + 50
+          };
+          break;
+        case 'circle':
+          const rings = Math.ceil(Math.sqrt(ROBOT_COUNT / Math.PI));
+          const robotsPerRing = Math.ceil(ROBOT_COUNT / rings);
+          const ring = Math.floor(index / robotsPerRing);
+          const posInRing = index % robotsPerRing;
+          const angle = (posInRing / robotsPerRing) * 2 * Math.PI;
+          const radius = (ring + 1) * 30;
+          targetPosition = {
+            x: CANVAS_WIDTH / 2 + Math.cos(angle) * radius,
+            y: CANVAS_HEIGHT / 2 + Math.sin(angle) * radius
+          };
+          break;
+        case 'line':
+          const robotsPerRow = Math.ceil(Math.sqrt(ROBOT_COUNT));
+          targetPosition = {
+            x: (index % robotsPerRow) * (CANVAS_WIDTH / robotsPerRow),
+            y: Math.floor(index / robotsPerRow) * 20 + 100
+          };
+          break;
+        case 'swarm':
+          const centerX = CANVAS_WIDTH / 2;
+          const centerY = CANVAS_HEIGHT / 2;
+          const swarmRadius = Math.min(CANVAS_WIDTH, CANVAS_HEIGHT) * 0.3;
+          const swarmAngle = Math.random() * 2 * Math.PI;
+          const swarmDistance = Math.random() * swarmRadius;
+          targetPosition = {
+            x: centerX + Math.cos(swarmAngle) * swarmDistance,
+            y: centerY + Math.sin(swarmAngle) * swarmDistance
+          };
+          break;
+        case 'patrol':
+          const patrolPoints = [
+            { x: 100, y: 100 },
+            { x: CANVAS_WIDTH - 100, y: 100 },
+            { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT - 100 },
+            { x: 100, y: CANVAS_HEIGHT - 100 }
+          ];
+          targetPosition = patrolPoints[index % patrolPoints.length];
+          break;
+        case 'random':
+          targetPosition = {
+            x: Math.random() * CANVAS_WIDTH,
+            y: Math.random() * CANVAS_HEIGHT
+          };
+          break;
+      }
+      
+      return {
+        ...robot,
+        formation: targetPosition,
+        velocity: {
+          x: (targetPosition.x - robot.position.x) * 0.03,
+          y: (targetPosition.y - robot.position.y) * 0.03
+        }
+      };
+    }));
+  }, []);
+
+  const assignMission = useCallback((robotIds: string[], mission: string, priority: Robot['mission']['priority']) => {
+    setRobots(prev => prev.map(robot => 
+      robotIds.includes(robot.id) ? {
+        ...robot,
+        mission: {
+          ...robot.mission,
+          currentObjective: mission,
+          priority,
+          progress: 0,
+          estimatedCompletion: Date.now() + Math.random() * 24 * 60 * 60 * 1000
+        }
+      } : robot
+    ));
+  }, []);
+
+  const getFleetStats = useCallback((): FleetStats => {
+    const activeCount = robots.filter(r => r.status === 'active').length;
+    const inactiveCount = robots.filter(r => r.status === 'inactive').length;
+    const maintenanceCount = robots.filter(r => r.status === 'maintenance').length;
+    const errorCount = robots.filter(r => r.status === 'error').length;
+    const chargingCount = robots.filter(r => r.status === 'charging').length;
+    const patrolCount = robots.filter(r => r.status === 'patrol').length;
+    
+    const avgBattery = robots.reduce((sum, r) => sum + r.battery, 0) / robots.length;
+    const avgEfficiency = robots.reduce((sum, r) => sum + r.efficiency, 0) / robots.length;
+    const avgHealth = robots.reduce((sum, r) => sum + r.health, 0) / robots.length;
+    const avgPerformance = robots.reduce((sum, r) => sum + r.performance.uptime, 0) / robots.length;
+    const avgCommunication = robots.reduce((sum, r) => sum + r.communication.signalStrength, 0) / robots.length;
+    
+    return {
+      totalRobots: robots.length,
+      activeRobots: activeCount,
+      inactiveRobots: inactiveCount,
+      maintenanceRobots: maintenanceCount,
+      errorRobots: errorCount,
+      chargingRobots: chargingCount,
+      patrolRobots: patrolCount,
+      averageBattery: avgBattery,
+      averageEfficiency: avgEfficiency,
+      averageHealth: avgHealth,
+      totalTasks: robots.filter(r => r.mission.currentObjective).length,
+      completedTasks: robots.filter(r => r.mission.progress >= 100).length,
+      fleetPerformance: {
+        overallEfficiency: avgPerformance,
+        predictedDowntime: Math.max(0, 100 - avgHealth),
+        energyConsumption: robots.reduce((sum, r) => sum + r.energy.consumption, 0) / robots.length,
+        communicationHealth: avgCommunication,
+        aiOptimization: robots.filter(r => r.aiMode === 'autonomous').length / robots.length * 100
+      },
+      predictiveAnalytics: {
+        maintenanceAlerts: robots.filter(r => r.health < 70 || r.battery < 20).length,
+        batteryReplacements: robots.filter(r => r.energy.batteryHealth < 60).length,
+        performanceTrends: avgPerformance > 90 ? 'improving' : avgPerformance > 70 ? 'stable' : 'declining',
+        riskAssessment: errorCount > 50 ? 'high' : errorCount > 20 ? 'medium' : 'low'
+      },
+      missionStats: {
+        activeMissions: robots.filter(r => r.mission.currentObjective && r.mission.progress < 100).length,
+        completionRate: robots.filter(r => r.mission.progress >= 100).length / Math.max(1, robots.filter(r => r.mission.currentObjective).length) * 100,
+        averageResponseTime: Math.random() * 5 + 2,
+        criticalTasks: robots.filter(r => r.mission.priority === 'critical').length
+      }
+    };
+  }, [robots]);
+
+  return {
+    robots,
+    selectedRobots,
+    setSelectedRobots,
+    isRunning,
+    setIsRunning,
+    formation,
+    aiEnabled,
+    setAiEnabled,
+    emergencyMode,
+    activateRobots,
+    deactivateRobots,
+    emergencyStop,
+    setFormationPattern,
+    assignMission,
+    getFleetStats
+  };
+};
